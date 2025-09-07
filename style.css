@@ -1,15 +1,132 @@
-html, body {
+/* Base styles */
+body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  height: 100%;
-  width: 100%;
-  background-color: #000; /* dark background */
+  background: #000;
+  font-family: Arial, sans-serif;
 }
 
 #simulationCanvas {
   display: block;
-  width: 100%;
-  height: 100%;
-  /* background-color: #000;  dark background */
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+}
+
+/* Source link - glowing green at bottom */
+#sourceLink {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  text-align: center;
+}
+
+#sourceLink a {
+  color: #00ff00;
+  text-decoration: none;
+  font-family: monospace;
+  font-size: 14px;
+  text-shadow: 0 0 5px #00ff00, 0 0 10px #00ff00, 0 0 15px #00ff00;
+  transition: all 0.3s ease;
+}
+
+#sourceLink a:hover {
+  text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00, 0 0 30px #00ff00;
+  transform: scale(1.1);
+}
+
+/* Desktop layout */
+#graphCanvas {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  background: rgba(0,0,0,0.9);
+  border-radius: 4px;
+  padding: 5px;
+}
+
+#statsCanvas {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  background: rgba(0,0,0,0.7);
+  border-radius: 8px;
+  padding: 10px;
+  font-family: sans-serif;
+  font-size: 12px;
+  color: white;
+}
+
+/* Mobile responsive layout */
+@media (max-width: 768px) {
+  #graphCanvas {
+    width: 95vw !important;
+    height: 40vh !important;
+    left: 2.5vw !important;
+    top: 5px !important;
+    border-radius: 8px;
+  }
+
+  #statsCanvas {
+    position: absolute;
+    top: auto !important;
+    bottom: 10px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+    width: 90vw !important;
+    height: 25vh !important;
+    font-size: 14px !important;
+    text-align: center;
+    border-radius: 12px;
+    padding: 15px;
+  }
+
+  #sourceLink {
+    bottom: 10px !important;
+  }
+
+  #sourceLink a {
+    font-size: 12px !important;
+  }
+
+  /* Adjust icon sizes for mobile in JS */
+  .mobile-icons {
+    font-size: 20px !important;
+  }
+}
+
+/* Landscape mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  #graphCanvas {
+    height: 60vh !important;
+  }
+
+  #statsCanvas {
+    height: 20vh !important;
+    bottom: 5px !important;
+  }
+
+  #sourceLink {
+    bottom: 5px !important;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+  #statsCanvas {
+    font-size: 12px !important;
+    padding: 10px;
+  }
+
+  #sourceLink a {
+    font-size: 10px !important;
+    text-shadow: 0 0 3px #00ff00, 0 0 6px #00ff00, 0 0 9px #00ff00;
+  }
 }
