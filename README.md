@@ -20,7 +20,7 @@ Refactored for production readiness with comprehensive JSDoc documentation, sepa
 - **Movement & Physics:** Continuous motion with edge bouncing, soft boundary forces, and speed clamping between CONFIG.TARGET_SPEED and CONFIG.MAX_SPEED
 - **Interactions:** RPSLS rule-based collisions with health redistribution or type/group conversion; intra-group flocking (alignment, attraction, repulsion) and health balancing
 - **Lifespan & Replacement:** Entities age up to CONFIG.MAX_AGE_SECONDS (60s); dead entities replaced with new random spawns; damage cooldown CONFIG.DAMAGE_COOLDOWN_FRAMES (2s)
-- **Group Dynamics:** Groups limited to 7 members (split when exceeded); merging for same-type collisions ≤7 total; HSL-colored by groupId for visual distinction
+- **Group Dynamics:** Groups limited to 7 members (split when exceeded); merging for same-type collisions ≤7 total; HSL-colored by groupId for visual distinction; tractor beam-like connection lines between same-group entities within attraction range (CONFIG.MAX_ATTRACT_DIST), with dynamic thickness (0.5-1.0px) based on distance and minimum distance check to hide lines during close contact
 - **Health Visualization:** Dynamic health bars (green >50%, yellow 25-50%, red <25%) with validation clamping 0-1
 - **Collision Detection:** Hitbox-based (CONFIG.HITBOX_RADIUS = 64% entity radius) with separation correction and velocity bounds checking
 
@@ -31,6 +31,7 @@ Refactored for production readiness with comprehensive JSDoc documentation, sepa
   - Current value icons positioned at trace heights; responsive sizing (CONFIG.ICON_MOBILE_SIZE = 18, etc.)
   - Minimal green axes (COLORS.AXIS_COLOR = '#00ff00'); time label "1 min window"
 - **ND-Filter Overlay:** Subtle rgba(0,0,0,0.4) darkening on graph/stats for UI subtlety (CONFIG.ND_FILTER_OPACITY = 0.4)
+- **Group Connection Lines:** Dynamic tractor beam visualization connecting same-group entities; lines appear only between minimum distance (1.5 * CONFIG.HITBOX_RADIUS) and maximum attraction distance; fixed opacity 0.6, thickness scaling inversely with distance for emphasis on attraction strength; drawn behind entities for layering
 - **Layering:** Simulation z-index 3 (foreground), UI z-index 2, source link z-index 4
 - **Responsive Design:** Breakpoints at CONFIG.MOBILE_BREAKPOINT = 768px and VERY_SMALL_BREAKPOINT = 480px; viewport percentages for sizing; font/icon scaling
 

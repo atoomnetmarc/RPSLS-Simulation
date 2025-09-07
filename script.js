@@ -1105,6 +1105,51 @@ function updateUI(currentTime) {
 
 function drawEntities() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw group connection lines before entities to appear behind
+  const groups = {};
+  for (const entity of entities) {
+    const key = `${entity.type}_${entity.groupId}`;
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+    groups[key].push(entity);
+  }
+
+  const minDist = 1.5 * CONFIG.HITBOX_RADIUS; // Minimum distance to show line (hide when very close)
+
+  for (const groupKey in groups) {
+    const group = groups[groupKey];
+    if (group.length < 2) continue;
+
+    const color = groupColor(parseInt(groupKey.split('_')[1]));
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.6; // Fixed opacity for consistent visibility
+
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const e1 = group[i];
+        const e2 = group[j];
+        const dx = e1.x - e2.x;
+        const dy = e1.y - e2.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > minDist && dist < CONFIG.MAX_ATTRACT_DIST) {
+          // Thickness based on inverse distance (thinner far, up to 200% thicker when close)
+          const thicknessMultiplier = 1 + 1 * (1 - (dist / CONFIG.MAX_ATTRACT_DIST));
+          ctx.lineWidth = 0.5 * thicknessMultiplier; // Base 0.5, up to 1.0
+
+          ctx.beginPath();
+          ctx.moveTo(e1.x, e1.y);
+          ctx.lineTo(e2.x, e2.y);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+  ctx.globalAlpha = 1.0; // Reset alpha
+  ctx.lineWidth = 1; // Reset line width
+
   for (const entity of entities) {
     entity.draw(ctx);
   }
