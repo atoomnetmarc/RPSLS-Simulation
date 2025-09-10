@@ -9,9 +9,8 @@ body {
 
 #simulationCanvas {
   display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 3;
 }
 
@@ -44,8 +43,8 @@ body {
   position: absolute;
   top: 10px;
   left: 10px;
-  z-index: 2;
-  background: rgba(0,0,0,0.9);
+  z-index: 1;
+  background: rgba(0,0,0,0.5);
   border-radius: 4px;
   padding: 5px;
 }
@@ -54,8 +53,8 @@ body {
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 2;
-  background: rgba(0,0,0,0.7);
+  z-index: 1;
+  background: rgba(0,0,0,0.5);
   border-radius: 8px;
   padding: 10px;
   font-family: sans-serif;
@@ -66,11 +65,12 @@ body {
 /* Mobile responsive layout */
 @media (max-width: 768px) {
   #graphCanvas {
-    width: 95vw !important;
-    height: 40vh !important;
-    left: 2.5vw !important;
+    width: 90vw !important;
+    height: 15vh !important;
+    left: 5vw !important;
     top: 5px !important;
     border-radius: 8px;
+    background: rgba(0,0,0,0.3);
   }
 
   #statsCanvas {
@@ -80,20 +80,21 @@ body {
     left: 50% !important;
     right: auto !important;
     transform: translateX(-50%);
-    width: 90vw !important;
-    height: 25vh !important;
-    font-size: 14px !important;
+    width: 80vw !important;
+    height: 15vh !important;
+    font-size: 12px !important;
     text-align: center;
     border-radius: 12px;
-    padding: 15px;
+    padding: 10px;
+    background: rgba(0,0,0,0.3);
   }
 
   #sourceLink {
-    bottom: 10px !important;
+    bottom: 5px !important;
   }
 
   #sourceLink a {
-    font-size: 12px !important;
+    font-size: 10px !important;
   }
 
   /* Adjust icon sizes for mobile in JS */
@@ -105,16 +106,16 @@ body {
 /* Landscape mobile */
 @media (max-width: 768px) and (orientation: landscape) {
   #graphCanvas {
-    height: 60vh !important;
+    height: 25vh !important;
   }
 
   #statsCanvas {
-    height: 20vh !important;
+    height: 12vh !important;
     bottom: 5px !important;
   }
 
   #sourceLink {
-    bottom: 5px !important;
+    bottom: 2px !important;
   }
 }
 

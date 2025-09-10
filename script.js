@@ -92,33 +92,30 @@ const graphCanvas = document.getElementById('graphCanvas');
 const graphCtx = graphCanvas.getContext('2d');
 
 let lastGraphUpdateFrame = 0;
+let lastUIUpdateTime = 0;
+let prevWidth = window.innerWidth;
+let prevHeight = window.innerHeight;
 
 
 function resizeSimulationCanvas() {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = window.innerWidth * dpr;
-  canvas.height = window.innerHeight * dpr;
-  ctx.scale(dpr, dpr);
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
 
 function resizeUI(currentTime, frameCount) {
   if (typeof frameCount === 'undefined') return; // Skip during initialization
 
-  const dpr = window.devicePixelRatio || 1;
-
   // Resize graph canvas using responsive dimensions
   const { baseWidth: graphBaseWidth, baseHeight: graphBaseHeight } = calculateDimensions(currentTime);
-  graphCanvas.width = graphBaseWidth * dpr;
-  graphCanvas.height = graphBaseHeight * dpr;
-  graphCtx.scale(dpr, dpr);
+  graphCanvas.width = graphBaseWidth;
+  graphCanvas.height = graphBaseHeight;
 
   // Resize stats canvas using responsive logic
   const isMobile = window.innerWidth <= CONFIG.MOBILE_BREAKPOINT;
   const statsWidth = isMobile ? window.innerWidth * CONFIG.STATS_MOBILE_WIDTH_PCT : 250;
   const statsHeight = isMobile ? window.innerHeight * CONFIG.STATS_MOBILE_HEIGHT_PCT : 200;
-  statsCanvas.width = statsWidth * dpr;
-  statsCanvas.height = statsHeight * dpr;
-  statsCtx.scale(dpr, dpr);
+  statsCanvas.width = statsWidth;
+  statsCanvas.height = statsHeight;
 
   // Clear UI canvases after resize
   graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
@@ -140,6 +137,7 @@ function resizeCanvas() {
     resizeUI(currentTime, frameCount);
   }
 }
+
 window.addEventListener('resize', resizeCanvas);
 resizeSimulationCanvas(); // Initial call - only simulation canvas
 
@@ -453,10 +451,9 @@ function drawGraph(currentTime) {
     graphCanvas.style.position = 'absolute';
     graphCanvas.style.top = '10px';
     graphCanvas.style.left = isMobile ? '2.5%' : '10px';
-    graphCanvas.style.background = `rgba(0,0,0,0.9)`;
+    graphCanvas.style.background = `rgba(0,0,0,0.4)`;
     graphCanvas.style.borderRadius = isMobile ? '8px' : '4px';
     graphCanvas.style.padding = isMobile ? '5px' : '5px';
-    graphCanvas.style.zIndex = `${CONFIG.UI_Z_INDEX}`;
 
     // Clear canvas and render graph components
     graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
@@ -1037,15 +1034,10 @@ function updateUI(currentTime) {
   }
 
   try {
-    // Update stats 4 times per second (every CONFIG.STATS_UPDATE_INTERVAL frames)
-    if (frameCount % CONFIG.STATS_UPDATE_INTERVAL !== 0) {
-      return;
-    }
-
     const stats = computeStats();
 
-    // Update graph history 4 times per second (CONFIG.GRAPH_UPDATE_INTERVAL frames)
-    if (frameCount - lastGraphUpdateFrame >= CONFIG.GRAPH_UPDATE_INTERVAL) {
+    // Update graph history every frame for continuous streaming
+    if (frameCount - lastGraphUpdateFrame >= 1) {
       updateGraphHistory(stats, currentTime);
       lastGraphUpdateFrame = frameCount;
     }
@@ -1064,13 +1056,12 @@ function updateUI(currentTime) {
     statsCanvas.style.bottom = isMobile ? '10px' : 'auto';
     statsCanvas.style.left = isMobile ? '5%' : 'auto';
     statsCanvas.style.transform = isMobile ? 'translateX(-50%)' : 'none';
-    statsCanvas.style.background = 'rgba(0,0,0,0.7)';
+    statsCanvas.style.background = 'rgba(0,0,0,0.4)';
     statsCanvas.style.borderRadius = isMobile ? '12px' : '8px';
     statsCanvas.style.padding = isMobile ? '15px' : '10px';
     statsCanvas.style.fontFamily = 'sans-serif';
     statsCanvas.style.fontSize = `${statsFontSize}px`;
     statsCanvas.style.color = 'white';
-    statsCanvas.style.zIndex = `${CONFIG.UI_Z_INDEX}`;
     statsCanvas.style.textAlign = isMobile ? 'center' : 'left';
 
     statsCtx.clearRect(0, 0, statsCanvas.width, statsCanvas.height);
@@ -1153,18 +1144,26 @@ function drawEntities() {
   for (const entity of entities) {
     entity.draw(ctx);
   }
-
-  const currentTime = frameCount / CONFIG.FPS;
-
-  updateUI(currentTime);
-
-  // Draw graph canvas every frame (oscilloscope style)
-  drawGraph(currentTime);
 }
 
 function animate() {
+  const currentTime = frameCount / CONFIG.FPS;
+
+  // Check for resize every frame (throttled by change detection)
+  const currWidth = window.innerWidth;
+  const currHeight = window.innerHeight;
+  if (currWidth !== prevWidth || currHeight !== prevHeight) {
+    resizeCanvas();
+    prevWidth = currWidth;
+    prevHeight = currHeight;
+  }
+
   updateSimulation();
   drawEntities();
+
+  // UI updates every frame for responsive stats/graph
+  updateUI(currentTime);
+  drawGraph(currentTime);
 
   requestAnimationFrame(animate);
 }
