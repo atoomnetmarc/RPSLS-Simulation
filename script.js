@@ -62,6 +62,18 @@ const CONFIG = {
   SPAWN_PARTICLE_COUNT: 9, // Particles spawned on entity spawn (balanced)
   PARTICLE_GRAVITY: 0.015, // Downward pull on particles
   PARTICLE_FRICTION: 0.97, // Velocity dampening per frame
+
+  // Group behavior - Entity group management
+  MAX_GROUP_SIZE: 7, // Maximum entities per group before splitting
+  MIN_GROUP_SIZE_FOR_SPAWN: 7, // Minimum group size to join when spawning
+
+  // Physics forces - Movement and interaction forces
+  ATTRACTION_FORCE: 0.005, // Force between different groups of same type
+  SAME_TYPE_ATTRACTION: 0.01, // Attraction force at medium distance (same group)
+  REPULSION_FORCE: 0.08, // Repulsion force when too close (same group)
+  DAMAGE_PERCENT: 0.1, // Base damage as fraction of max age
+  MAX_DAMAGE_PERCENT: 0.5, // Maximum damage cap as fraction of max age
+  REDISTRIBUTION_FACTOR: 0.05, // Health redistribution smoothing factor
 };
 
 /**
@@ -1218,7 +1230,7 @@ function spawnEntity() {
   }
   let groupId = null;
   for (const gid in groupCounts) {
-    if (groupCounts[gid] < 7) {
+    if (groupCounts[gid] < CONFIG.MIN_GROUP_SIZE_FOR_SPAWN) {
       groupId = parseInt(gid);
       break;
     }
@@ -1268,7 +1280,7 @@ function handleGroupSplitting() {
   }
   for (const gid in groupSizes) {
     const group = groupSizes[gid];
-    if (group.length > 7) {
+    if (group.length > CONFIG.MAX_GROUP_SIZE) {
       const half = Math.ceil(group.length / 2);
       const newGroupId = nextGroupId++;
       for (let i = 0; i < half; i++) {
@@ -1311,9 +1323,8 @@ function applyAlignmentAndAttraction() {
         if (dist < CONFIG.MAX_ATTRACT_DIST) {
           const nx = dx / dist;
           const ny = dy / dist;
-          const force = 0.005;
-          e1.vx += nx * force;
-          e1.vy += ny * force;
+          e1.vx += nx * CONFIG.ATTRACTION_FORCE;
+          e1.vy += ny * CONFIG.ATTRACTION_FORCE;
         }
       }
     }
@@ -1328,153 +1339,149 @@ function applyAlignmentAndAttraction() {
   }
 }
 
-function resolveCollisions() {
-  for (let i = 0; i < entities.length; i++) {
-    for (let j = i + 1; j < entities.length; j++) {
-      const e1 = entities[i];
-      const e2 = entities[j];
-      const dx = e1.x - e2.x;
-      const dy = e1.y - e2.y;
-      const distSquared = dx * dx + dy * dy;
-      let dist = Math.sqrt(distSquared);
-      dist = Math.max(dist, 0.001); // Prevent division by zero
+/**
+ * @function applyForceToEntity
+ * @param {Entity} entity - Entity to apply force to
+ * @param {number} nx - Normalized X direction
+ * @param {number} ny - Normalized Y direction
+ * @param {number} force - Force magnitude to apply
+ * @description Applies a directional force to an entity, clamping to max speed.
+ */
+function applyForceToEntity(entity, nx, ny, force) {
+  entity.vx = Math.max(
+    -CONFIG.MAX_SPEED,
+    Math.min(CONFIG.MAX_SPEED, entity.vx + nx * force),
+  );
+  entity.vy = Math.max(
+    -CONFIG.MAX_SPEED,
+    Math.min(CONFIG.MAX_SPEED, entity.vy + ny * force),
+  );
+}
 
-      if (e1.type === e2.type) {
-        const nx = dx / dist;
-        const ny = dy / dist;
+/**
+ * @function handleSameGroupForces
+ * @param {Entity} e1 - First entity
+ * @param {Entity} e2 - Second entity
+ * @param {number} dist - Distance between entities
+ * @param {number} nx - Normalized X direction
+ * @param {number} ny - Normalized Y direction
+ * @description Applies attraction/repulsion forces between entities of the same group.
+ */
+function handleSameGroupForces(e1, e2, dist, nx, ny) {
+  if (dist > 2 * CONFIG.HITBOX_RADIUS * 1.2 && dist < CONFIG.MAX_ATTRACT_DIST) {
+    // Medium distance: attract toward each other
+    applyForceToEntity(e1, -nx, -ny, CONFIG.SAME_TYPE_ATTRACTION);
+    applyForceToEntity(e2, nx, ny, CONFIG.SAME_TYPE_ATTRACTION);
+  } else if (dist < 2 * CONFIG.HITBOX_RADIUS * 1.2) {
+    // Too close: repel from each other
+    applyForceToEntity(e1, nx, ny, CONFIG.REPULSION_FORCE);
+    applyForceToEntity(e2, -nx, -ny, CONFIG.REPULSION_FORCE);
+  }
+}
 
-        if (e1.groupId === e2.groupId) {
-          if (
-            dist > 2 * CONFIG.HITBOX_RADIUS * 1.2 &&
-            dist < CONFIG.MAX_ATTRACT_DIST
-          ) {
-            const force = 0.01;
-            e1.vx = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e1.vx - nx * force),
-            );
-            e1.vy = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e1.vy - ny * force),
-            );
-            e2.vx = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e2.vx + nx * force),
-            );
-            e2.vy = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e2.vy + ny * force),
-            );
-          } else if (dist < 2 * CONFIG.HITBOX_RADIUS * 1.2) {
-            const force = 0.08;
-            e1.vx = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e1.vx + nx * force),
-            );
-            e1.vy = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e1.vy + ny * force),
-            );
-            e2.vx = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e2.vx - nx * force),
-            );
-            e2.vy = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e2.vy - ny * force),
-            );
-          }
-        } else {
-          if (dist < CONFIG.MAX_ATTRACT_DIST) {
-            const force = 0.005;
-            e1.vx = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e1.vx + nx * force),
-            );
-            e1.vy = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e1.vy + ny * force),
-            );
-            e2.vx = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e2.vx - nx * force),
-            );
-            e2.vy = Math.max(
-              -CONFIG.MAX_SPEED,
-              Math.min(CONFIG.MAX_SPEED, e2.vy - ny * force),
-            );
-          }
+/**
+ * @function handleDifferentGroupForces
+ * @param {Entity} e1 - First entity
+ * @param {Entity} e2 - Second entity
+ * @param {number} dist - Distance between entities
+ * @param {number} nx - Normalized X direction
+ * @param {number} ny - Normalized Y direction
+ * @description Applies attraction forces between entities of different groups (same type).
+ */
+function handleDifferentGroupForces(e1, e2, dist, nx, ny) {
+  if (dist < CONFIG.MAX_ATTRACT_DIST) {
+    applyForceToEntity(e1, nx, ny, CONFIG.ATTRACTION_FORCE);
+    applyForceToEntity(e2, -nx, -ny, CONFIG.ATTRACTION_FORCE);
+  }
+}
+
+/**
+ * @function resolveOverlap
+ * @param {Entity} e1 - First entity
+ * @param {Entity} e2 - Second entity
+ * @param {number} dist - Distance between entities
+ * @param {number} nx - Normalized X direction
+ * @param {number} ny - Normalized Y direction
+ * @description Resolves physical overlap between same-type entities by separating them.
+ */
+function resolveOverlap(e1, e2, dist, nx, ny) {
+  const minDist = 2 * CONFIG.HITBOX_RADIUS;
+  if (dist < minDist) {
+    const overlap = Math.min(minDist - dist, minDist * 0.5);
+    const correctionX = (nx * overlap) / 2;
+    const correctionY = (ny * overlap) / 2;
+    e1.x = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e1.x + correctionX),
+    );
+    e1.y = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e1.y + correctionY),
+    );
+    e2.x = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e2.x - correctionX),
+    );
+    e2.y = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e2.y - correctionY),
+    );
+  }
+}
+
+/**
+ * @function handleSameTypeCollision
+ * @param {Entity} e1 - First entity
+ * @param {Entity} e2 - Second entity
+ * @description Handles collision between entities of the same type including damage and group merging.
+ */
+function handleSameTypeCollision(e1, e2) {
+  if (e1.groupId !== e2.groupId) {
+    // Apply damage to both entities
+    if (
+      frameCount > e1.lastDamageFrame + CONFIG.DAMAGE_COOLDOWN_FRAMES &&
+      frameCount > e2.lastDamageFrame + CONFIG.DAMAGE_COOLDOWN_FRAMES
+    ) {
+      const damage = Math.min(
+        e1.maxAge * CONFIG.DAMAGE_PERCENT,
+        e1.maxAge * CONFIG.MAX_DAMAGE_PERCENT,
+      );
+      e1.age = Math.min(e1.maxAge, e1.age + damage);
+      e2.age = Math.min(e2.maxAge, e2.age + damage);
+      e1.lastDamageFrame = frameCount;
+      e2.lastDamageFrame = frameCount;
+    }
+
+    // Check if groups should merge
+    const group1Size = Math.max(
+      0,
+      entities.filter((e) => e.type === e1.type && e.groupId === e1.groupId)
+        .length,
+    );
+    const group2Size = Math.max(
+      0,
+      entities.filter((e) => e.type === e2.type && e.groupId === e2.groupId)
+        .length,
+    );
+    if (group1Size + group2Size <= CONFIG.MAX_GROUP_SIZE) {
+      const oldGroupId = e2.groupId;
+      const newGroupId = e1.groupId;
+      for (const ent of entities) {
+        if (ent.type === e1.type && ent.groupId === oldGroupId) {
+          ent.groupId = newGroupId;
         }
-
-        const minDist = 2 * CONFIG.HITBOX_RADIUS;
-        if (dist < minDist) {
-          const overlap = Math.min(minDist - dist, minDist * 0.5); // Limit correction amount
-          const correctionX = (nx * overlap) / 2;
-          const correctionY = (ny * overlap) / 2;
-          e1.x = Math.max(
-            CONFIG.ENTITY_RADIUS,
-            Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e1.x + correctionX),
-          );
-          e1.y = Math.max(
-            CONFIG.ENTITY_RADIUS,
-            Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e1.y + correctionY),
-          );
-          e2.x = Math.max(
-            CONFIG.ENTITY_RADIUS,
-            Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e2.x - correctionX),
-          );
-          e2.y = Math.max(
-            CONFIG.ENTITY_RADIUS,
-            Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e2.y - correctionY),
-          );
-        }
-      }
-
-      if (dist < 2 * CONFIG.HITBOX_RADIUS) {
-        // Damage entities of same type but different groups on collision
-        if (e1.type === e2.type && e1.groupId !== e2.groupId) {
-          if (
-            frameCount > e1.lastDamageFrame + CONFIG.DAMAGE_COOLDOWN_FRAMES &&
-            frameCount > e2.lastDamageFrame + CONFIG.DAMAGE_COOLDOWN_FRAMES
-          ) {
-            const damage = Math.min(e1.maxAge * 0.1, e1.maxAge * 0.5); // Cap damage at 50%
-            e1.age = Math.min(e1.maxAge, e1.age + damage);
-            e2.age = Math.min(e2.maxAge, e2.age + damage);
-            e1.lastDamageFrame = frameCount;
-            e2.lastDamageFrame = frameCount;
-          }
-
-          // Check if groups should merge
-          const group1Size = Math.max(
-            0,
-            entities.filter(
-              (e) => e.type === e1.type && e.groupId === e1.groupId,
-            ).length,
-          );
-          const group2Size = Math.max(
-            0,
-            entities.filter(
-              (e) => e.type === e2.type && e.groupId === e2.groupId,
-            ).length,
-          );
-          if (group1Size + group2Size <= 7) {
-            const oldGroupId = e2.groupId;
-            const newGroupId = e1.groupId;
-            for (const ent of entities) {
-              if (ent.type === e1.type && ent.groupId === oldGroupId) {
-                ent.groupId = newGroupId;
-              }
-            }
-          }
-        }
-        handleInteraction(e1, e2);
       }
     }
   }
+}
 
+/**
+ * @function replaceDeadEntities
+ * @description Replaces dead entities with new spawns, creating visual effects.
+ */
+function replaceDeadEntities() {
   for (let i = 0; i < entities.length; i++) {
     if (entities[i].isDead()) {
-      // Spawn death effect for the dying entity
       const deadEntity = entities[i];
       particleManager.spawnDeathEffect(
         deadEntity.x,
@@ -1482,7 +1489,6 @@ function resolveCollisions() {
         groupColor(deadEntity.groupId),
       );
 
-      // Replace with new entity and spawn effect
       const newEntity = spawnEntity();
       particleManager.spawnSpawnEffect(
         newEntity.x,
@@ -1494,10 +1500,50 @@ function resolveCollisions() {
   }
 }
 
-function redistributeHealth() {
-  const REDISTRIBUTION_RADIUS = CONFIG.ALIGN_RADIUS;
-  const REDISTRIBUTION_FACTOR = 0.05;
+/**
+ * @function resolveCollisions
+ * @description Main collision resolution loop. Checks all entity pairs for collisions,
+ * applies forces, resolves overlaps, handles damage/merging, and triggers RPSLS interactions.
+ */
+function resolveCollisions() {
+  for (let i = 0; i < entities.length; i++) {
+    for (let j = i + 1; j < entities.length; j++) {
+      const e1 = entities[i];
+      const e2 = entities[j];
+      const dx = e1.x - e2.x;
+      const dy = e1.y - e2.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      dist = Math.max(dist, 0.001); // Prevent division by zero
 
+      if (e1.type === e2.type) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+
+        // Apply forces based on group relationship
+        if (e1.groupId === e2.groupId) {
+          handleSameGroupForces(e1, e2, dist, nx, ny);
+        } else {
+          handleDifferentGroupForces(e1, e2, dist, nx, ny);
+        }
+
+        // Resolve physical overlap
+        resolveOverlap(e1, e2, dist, nx, ny);
+      }
+
+      // Handle close-range interactions
+      if (dist < 2 * CONFIG.HITBOX_RADIUS) {
+        if (e1.type === e2.type) {
+          handleSameTypeCollision(e1, e2);
+        }
+        handleInteraction(e1, e2);
+      }
+    }
+  }
+
+  replaceDeadEntities();
+}
+
+function redistributeHealth() {
   for (let i = 0; i < entities.length; i++) {
     const e1 = entities[i];
     let sumAge = 0;
@@ -1514,7 +1560,7 @@ function redistributeHealth() {
       const dy = e1.y - e2.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < REDISTRIBUTION_RADIUS) {
+      if (dist < CONFIG.ALIGN_RADIUS) {
         sumAge += e2.age;
         count++;
       }
@@ -1522,11 +1568,87 @@ function redistributeHealth() {
 
     if (count > 0) {
       const avgAge = sumAge / count;
-      e1.age += (avgAge - e1.age) * REDISTRIBUTION_FACTOR;
+      e1.age += (avgAge - e1.age) * CONFIG.REDISTRIBUTION_FACTOR;
     }
   }
 }
 
+/**
+ * @function processHunterPreyInteraction
+ * @param {Entity} hunter - The winning entity that attacks
+ * @param {Entity} prey - The losing entity being attacked
+ * @param {string} hunterColor - Hunter's group color for effects
+ * @param {string} preyColor - Prey's group color for effects
+ * @param {number} collisionX - X coordinate of collision point
+ * @param {number} collisionY - Y coordinate of collision point
+ * @description Handles the interaction between hunter and prey entities.
+ * Either converts the prey to hunter's type/group, or kills the prey and distributes health.
+ */
+function processHunterPreyInteraction(
+  hunter,
+  prey,
+  hunterColor,
+  preyColor,
+  collisionX,
+  collisionY,
+) {
+  // Spawn collision sparks
+  particleManager.spawnCollisionSparks(
+    collisionX,
+    collisionY,
+    hunterColor,
+    preyColor,
+  );
+
+  const preyHealth = (prey.maxAge - prey.age) / prey.maxAge;
+
+  // Find all group members
+  const groupMembers = entities.filter(
+    (ent) => ent.groupId === hunter.groupId && ent.type === hunter.type,
+  );
+
+  let groupTotalHealth = 0;
+  for (const member of groupMembers) {
+    groupTotalHealth += (member.maxAge - member.age) / member.maxAge;
+  }
+
+  const maxGroupHealth = groupMembers.length;
+
+  if (groupTotalHealth + preyHealth <= maxGroupHealth) {
+    // Distribute prey's health among group members
+    const totalHealthGain = prey.maxAge - prey.age;
+    const healthPerMember = totalHealthGain / groupMembers.length;
+
+    for (const member of groupMembers) {
+      member.age -= healthPerMember;
+      if (member.age < 0) member.age = 0;
+    }
+
+    // Spawn death effect for prey
+    particleManager.spawnDeathEffect(prey.x, prey.y, preyColor);
+
+    // Prey dies
+    prey.age = prey.maxAge;
+  } else {
+    // Store old group color for conversion effect
+    const oldColor = groupColor(prey.groupId);
+
+    // Convert prey to hunter's group/type
+    prey.type = hunter.type;
+    prey.groupId = hunter.groupId;
+
+    // Spawn conversion ring effect
+    particleManager.spawnConversionRing(prey.x, prey.y, oldColor, hunterColor);
+  }
+}
+
+/**
+ * @function handleInteraction
+ * @param {Entity} e1 - First entity in collision
+ * @param {Entity} e2 - Second entity in collision
+ * @description Handles RPSLS interaction between two colliding entities.
+ * Determines which entity wins based on RPSLS rules and delegates to processHunterPreyInteraction.
+ */
 function handleInteraction(e1, e2) {
   // Get group colors for visual effects
   const color1 = groupColor(e1.groupId);
@@ -1535,109 +1657,25 @@ function handleInteraction(e1, e2) {
   const collisionY = (e1.y + e2.y) / 2;
 
   if (beats[e1.type].includes(e2.type)) {
-    const hunter = e1;
-    const prey = e2;
-
-    // Spawn collision sparks
-    particleManager.spawnCollisionSparks(
-      collisionX,
-      collisionY,
+    // e1 beats e2
+    processHunterPreyInteraction(
+      e1,
+      e2,
       color1,
       color2,
+      collisionX,
+      collisionY,
     );
-
-    const preyHealth = (prey.maxAge - prey.age) / prey.maxAge;
-
-    // Find all group members
-    const groupMembers = entities.filter(
-      (ent) => ent.groupId === hunter.groupId && ent.type === hunter.type,
-    );
-
-    let groupTotalHealth = 0;
-    for (const member of groupMembers) {
-      groupTotalHealth += (member.maxAge - member.age) / member.maxAge;
-    }
-
-    const maxGroupHealth = groupMembers.length;
-
-    if (groupTotalHealth + preyHealth <= maxGroupHealth) {
-      // Distribute prey's health among group members
-      const totalHealthGain = prey.maxAge - prey.age;
-      const healthPerMember = totalHealthGain / groupMembers.length;
-
-      for (const member of groupMembers) {
-        member.age -= healthPerMember;
-        if (member.age < 0) member.age = 0;
-      }
-
-      // Spawn death effect for prey
-      particleManager.spawnDeathEffect(prey.x, prey.y, color2);
-
-      // Prey dies
-      prey.age = prey.maxAge;
-    } else {
-      // Store old group color for conversion effect
-      const oldColor = groupColor(prey.groupId);
-
-      // Convert prey to hunter's group/type
-      prey.type = hunter.type;
-      prey.groupId = hunter.groupId;
-
-      // Spawn conversion ring effect
-      particleManager.spawnConversionRing(prey.x, prey.y, oldColor, color1);
-    }
   } else if (beats[e2.type].includes(e1.type)) {
-    const hunter2 = e2;
-    const prey2 = e1;
-
-    // Spawn collision sparks
-    particleManager.spawnCollisionSparks(
+    // e2 beats e1
+    processHunterPreyInteraction(
+      e2,
+      e1,
+      color2,
+      color1,
       collisionX,
       collisionY,
-      color1,
-      color2,
     );
-
-    const prey2Health = (prey2.maxAge - prey2.age) / prey2.maxAge;
-
-    // Find all group members
-    const groupMembers2 = entities.filter(
-      (ent) => ent.groupId === hunter2.groupId && ent.type === hunter2.type,
-    );
-
-    let groupTotalHealth2 = 0;
-    for (const member of groupMembers2) {
-      groupTotalHealth2 += (member.maxAge - member.age) / member.maxAge;
-    }
-
-    const maxGroupHealth2 = groupMembers2.length;
-
-    if (groupTotalHealth2 + prey2Health <= maxGroupHealth2) {
-      // Distribute prey's health among group members
-      const totalHealthGain2 = prey2.maxAge - prey2.age;
-      const healthPerMember2 = totalHealthGain2 / groupMembers2.length;
-
-      for (const member of groupMembers2) {
-        member.age -= healthPerMember2;
-        if (member.age < 0) member.age = 0;
-      }
-
-      // Spawn death effect for prey
-      particleManager.spawnDeathEffect(prey2.x, prey2.y, color1);
-
-      // Prey dies
-      prey2.age = prey2.maxAge;
-    } else {
-      // Store old group color for conversion effect
-      const oldColor = groupColor(prey2.groupId);
-
-      // Convert prey to hunter's group/type
-      prey2.type = hunter2.type;
-      prey2.groupId = hunter2.groupId;
-
-      // Spawn conversion ring effect
-      particleManager.spawnConversionRing(prey2.x, prey2.y, oldColor, color2);
-    }
   }
 }
 
