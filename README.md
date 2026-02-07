@@ -1,7 +1,8 @@
 **This animation was created by Vibe-Coding using these AI's**
+
 - [Quasar Alpha](https://openrouter.ai/openrouter/quasar-alpha)
 - [Sonoma Dusk Alpha](https://openrouter.ai/openrouter/sonoma-dusk-alpha)
-
+- [Pony Alpha](https://openrouter.ai/openrouter/pony-alpha)
 
 ---
 
@@ -16,6 +17,7 @@ Refactored for production readiness with comprehensive JSDoc documentation, sepa
 ## Features
 
 ### Core Simulation
+
 - **Entities:** Rock 🪨, Paper 📄, Scissors ✂️, Lizard 🦎, Spock 🖖 with position, velocity, type, age, health bar, and group ID
 - **Movement & Physics:** Continuous motion with edge bouncing, soft boundary forces, and speed clamping between CONFIG.TARGET_SPEED and CONFIG.MAX_SPEED
 - **Interactions:** RPSLS rule-based collisions with health redistribution or type/group conversion; intra-group flocking (alignment, attraction, repulsion) and health balancing
@@ -25,17 +27,29 @@ Refactored for production readiness with comprehensive JSDoc documentation, sepa
 - **Collision Detection:** Hitbox-based (CONFIG.HITBOX_RADIUS = 64% entity radius) with separation correction and velocity bounds checking
 
 ### UI & Visualization
+
 - **Real-time Statistics Panel:** Bottom-center (mobile) or top-right (desktop) showing count and avg health % for each type; updates 4×/second (CONFIG.STATS_UPDATE_INTERVAL = 15 frames)
 - **Oscilloscope-style Graph:** Top-left (desktop) or full-width top (mobile) with glowing traces for adjusted count (count × avg health) over 1-minute window (CONFIG.TIME_WINDOW_SECONDS = 60); updates 4×/second
   - Traces: Gray (rock), white (paper), red (scissors), green (lizard), yellow (spock) with CONFIG.GRAPH_GLOW_BLUR = 6
   - Current value icons positioned at trace heights; responsive sizing (CONFIG.ICON_MOBILE_SIZE = 18, etc.)
   - Minimal green axes (COLORS.AXIS_COLOR = '#00ff00'); time label "1 min window"
 - **ND-Filter Overlay:** Subtle rgba(0,0,0,0.4) darkening on graph/stats for UI subtlety (CONFIG.ND_FILTER_OPACITY = 0.4)
-- **Group Connection Lines:** Dynamic tractor beam visualization connecting same-group entities; lines appear only between minimum distance (1.5 * CONFIG.HITBOX_RADIUS) and maximum attraction distance; fixed opacity 0.6, thickness scaling inversely with distance for emphasis on attraction strength; drawn behind entities for layering
+- **Group Connection Lines:** Dynamic tractor beam visualization connecting same-group entities; lines appear only between minimum distance (1.5 \* CONFIG.HITBOX_RADIUS) and maximum attraction distance; fixed opacity 0.6, thickness scaling inversely with distance for emphasis on attraction strength; drawn behind entities for layering
 - **Layering:** Simulation z-index 3 (foreground), UI z-index 2, source link z-index 4
 - **Responsive Design:** Breakpoints at CONFIG.MOBILE_BREAKPOINT = 768px and VERY_SMALL_BREAKPOINT = 480px; viewport percentages for sizing; font/icon scaling
 
+### Visual Effects
+
+- **Particle System:** Managed particle effects with configurable limits (CONFIG.PARTICLE_LIMIT = 300) for performance optimization
+- **Collision Sparks:** Colorful spark particles fly outward when entities of different types collide; uses mix of both entity group colors
+- **Conversion Rings:** Expanding ring effect with color transition when prey converts to hunter type; shows transformation from original to new group color
+- **Death Effects:** Implosion particles converging toward center when entities die; creates dramatic disappearance effect
+- **Spawn Effects:** Burst particles expanding outward when new entities spawn; announces entity arrival
+- **Motion Trails:** Fading trail behind each moving entity; 5 positions with exponential fade using group colors
+- **Group Color Consistency:** All visual effects use HSL-based group colors for visual cohesion
+
 ### Technical Architecture
+
 - **Centralized Configuration:** CONFIG object for all constants (simulation physics, UI intervals, responsive breakpoints, z-indexes); COLORS for theming
 - **Modular Functions:** Graph rendering split into calculateDimensions(), drawAxes(), drawTraces(), drawIcons(), applyOverlay(); simulation separated from UI in updateSimulation() and updateUI()
 - **Error Handling:** Try-catch in UI functions; guards for empty history, division by zero, invalid contexts/data
@@ -44,6 +58,7 @@ Refactored for production readiness with comprehensive JSDoc documentation, sepa
 - **Performance:** 60 FPS simulation, 4 FPS UI updates; automatic history pruning; efficient collision detection O(n²) with early exits
 
 ### RPSLS Rules
+
 ```js
 const beats = {
   rock: ["scissors", "lizard"],
@@ -53,6 +68,7 @@ const beats = {
   spock: ["scissors", "rock"],
 };
 ```
+
 - Rock crushes Scissors/decapitates Lizard
 - Paper covers Rock/disproves Spock
 - Scissors cuts Paper/poisons Lizard
@@ -133,6 +149,7 @@ sequenceDiagram
 5. No build tools required - vanilla HTML/CSS/JS
 
 ### Development
+
 - Edit CONFIG/COLORS objects in script.js for simulation/UI customization
 - View JSDoc comments in script.js for function details
 - Test on mobile devices for responsive behavior
@@ -163,6 +180,7 @@ Over time, you'll see:
 ## Statistics and Visualization
 
 ### Real-time Statistics Panel
+
 - **Position:** Top-right (desktop, CONFIG.UI_Z_INDEX = 2) or bottom-center (mobile)
 - **Content:** Current count and average health % for each type with emoji symbols
 - **Update Rate:** CONFIG.STATS_UPDATE_INTERVAL = 15 frames (4×/second at 60 FPS)
@@ -170,6 +188,7 @@ Over time, you'll see:
 - **Error Handling:** Guards for invalid data; fallback to 0% health
 
 ### Oscilloscope-style Graph
+
 - **Position:** Top-left (desktop) or full-width top (mobile, z-index 2)
 - **Data:** Adjusted count (count × avgHealth) trends over CONFIG.TIME_WINDOW_SECONDS = 60s window
 - **Update Rate:** CONFIG.GRAPH_UPDATE_INTERVAL = 15 frames (4×/second)
@@ -184,14 +203,17 @@ Over time, you'll see:
 - **Responsive:** Height percentages (0.33 desktop, 0.25 mobile, 0.20 very small); icon/font scaling
 
 ### ND-Filter Overlay
+
 - **Effect:** Semi-transparent darkening (COLORS.ND_FILTER_COLOR = rgba(0,0,0,0.4)) on graph/stats
 - **Purpose:** Reduces UI prominence, focuses attention on simulation entities
 
 ### High-DPI Support
+
 - **Scaling:** devicePixelRatio applied to all canvas dimensions and contexts
 - **Sharpness:** ctx.scale(dpr, dpr) for crisp rendering on Retina/4K displays
 
 ### Initialization & Error Handling
+
 - **Graceful Startup:** Conditional UI skips during init to avoid ReferenceErrors with uninitialized globals
 - **Runtime Guards:** Try-catch in UI functions; validation for empty history, zero-division, invalid contexts
 - **Logging:** console.warn for non-fatal issues without disrupting simulation
@@ -201,18 +223,21 @@ Over time, you'll see:
 ## Technical Implementation
 
 ### Canvas Management
+
 - **Three Canvases:** Simulation (main), Graph (oscilloscope), Stats (panel)
 - **Dynamic Sizing:** JavaScript calculates dimensions based on viewport
 - **CSS Support:** Media queries handle positioning and basic styling
 - **Resize Handling:** Canvas dimensions update on window resize events
 
 ### Data Collection
+
 - **computeStats():** Calculates type counts and average health every 15 frames
 - **updateGraphHistory():** Records timestamped "adjusted count" values 4×/second
 - **Time-based Data:** Each data point includes timestamp for accurate scrolling
 - **Memory Management:** Automatically removes data older than 1-minute window
 
 ### Rendering Pipeline
+
 1. **updateEntities():** Physics, collisions, group dynamics (60 FPS)
 2. **drawEntities():** Clear simulation canvas, draw entities with health bars
 3. **drawStats():** Update and render stats panel (4×/second)
@@ -220,6 +245,7 @@ Over time, you'll see:
 5. **ND-filter Overlay:** Semi-transparent darkening applied last
 
 ### Color Scheme
+
 - **Entity Groups:** HSL-based rainbow colors based on group ID
 - **Health Bars:** Green → Orange → Red gradient based on remaining lifespan
 - **Graph Traces:** Type-specific colors matching icons for visual consistency
@@ -241,27 +267,32 @@ Over time, you'll see:
 ## Configuration & Customization
 
 ### Centralized Settings (script.js)
+
 - **CONFIG Object:** All constants (physics: ENTITY_RADIUS=30, MAX_SPEED=2.4; UI: STATS_UPDATE_INTERVAL=15; responsive: MOBILE_BREAKPOINT=768)
 - **COLORS Object:** Theming (GRAPH_LINE_COLORS for traces, HEALTH_BAR_GREEN/YELLOW/RED, AXIS_COLOR='#00ff00')
 - **Adjust:** Modify values in CONFIG/COLORS for simulation tuning or retheming without code changes
 
 ### Graph & Stats
+
 - Time window: CONFIG.TIME_WINDOW_SECONDS = 60 (1 min scrolling)
 - Update rate: CONFIG.GRAPH_UPDATE_INTERVAL = 15 (4×/s)
 - Y-scale default: CONFIG.GRAPH_DEFAULT_MAX_Y = 30
 - Glow: CONFIG.GRAPH_GLOW_BLUR = 6
 
 ### Responsive Design
+
 - Breakpoints: MOBILE_BREAKPOINT=768px, VERY_SMALL_BREAKPOINT=480px
 - Percentages: GRAPH_MOBILE_HEIGHT_PCT=0.25, STATS_MOBILE_WIDTH_PCT=0.9
 - Icons/Fonts: ICON_MOBILE_SIZE=18, FONT_DESKTOP_SIZE=10
 
 ### Visual Effects
+
 - Entity glow: shadowBlur=16, hsla(groupId-based hue, 80%, 50%, 0.5)
 - ND-filter: COLORS.ND_FILTER_COLOR = 'rgba(0,0,0,0.4)'
 - Health bars: Dynamic rgba gradients based on ratio (0-1 clamped)
 
 ### Development Tips
+
 - View JSDoc: Use VSCode IntelliSense or jsdoc-to-markdown tools
 - Test Resize: Browser dev tools device emulation
 - Debug: Console warnings for errors; frameCount for timing
@@ -279,6 +310,7 @@ Over time, you'll see:
 - **Testing:** Responsive via browser dev tools; error-free init confirmed
 
 ## Future Enhancements
+
 - Pause/Resume and speed controls via UI buttons
 - Data export (CSV of graph history)
 - Multiple time windows (15s/1m/5m toggle)

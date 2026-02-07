@@ -33,7 +33,7 @@ const CONFIG = {
   MOBILE_BREAKPOINT: 768, // Screen width threshold for mobile layout (pixels)
   VERY_SMALL_BREAKPOINT: 480, // Screen width threshold for very small screens
   GRAPH_MOBILE_HEIGHT_PCT: 0.25, // Graph height as percentage of viewport on mobile
-  GRAPH_VERY_SMALL_HEIGHT_PCT: 0.20, // Graph height percentage for very small screens
+  GRAPH_VERY_SMALL_HEIGHT_PCT: 0.2, // Graph height percentage for very small screens
   GRAPH_DESKTOP_HEIGHT_PCT: 0.33, // Graph height percentage for desktop
   STATS_MOBILE_HEIGHT_PCT: 0.25, // Stats panel height percentage on mobile
   STATS_MOBILE_WIDTH_PCT: 0.9, // Stats panel width percentage on mobile
@@ -51,7 +51,17 @@ const CONFIG = {
   FONT_MOBILE_SIZE: 12, // Font size for graph labels on mobile
   FONT_VERY_SMALL_SIZE: 10, // Font size for very small screens
   FONT_DESKTOP_SIZE: 10, // Font size for desktop
-  STATS_TITLE_FONT_SIZE_ADD: 2 // Additional size for stats title font
+  STATS_TITLE_FONT_SIZE_ADD: 2, // Additional size for stats title font
+
+  // Visual Effects - Particle system and animation settings
+  PARTICLE_LIMIT: 300, // Maximum particles on screen (balanced for performance)
+  TRAIL_LENGTH: 5, // Number of trail positions to store per entity
+  COLLISION_SPARK_COUNT: 7, // Particles spawned per collision (balanced)
+  CONVERSION_RING_SPEED: 2.5, // Ring expansion speed in pixels per frame
+  DEATH_PARTICLE_COUNT: 11, // Particles spawned on entity death (balanced)
+  SPAWN_PARTICLE_COUNT: 9, // Particles spawned on entity spawn (balanced)
+  PARTICLE_GRAVITY: 0.015, // Downward pull on particles
+  PARTICLE_FRICTION: 0.97, // Velocity dampening per frame
 };
 
 /**
@@ -63,39 +73,38 @@ const CONFIG = {
 const COLORS = {
   // Graph line colors for each RPSLS entity type (oscilloscope-style traces)
   GRAPH_LINE_COLORS: {
-    rock: '#808080',      // Gray - represents stone/rock
-    paper: '#ffffff',     // White - represents paper sheet
-    scissors: '#ff0000',  // Red - represents sharp metal blades
-    lizard: '#00ff00',    // Green - represents reptilian creature
-    spock: '#ffff00'      // Yellow - represents Vulcan salute
+    rock: "#808080", // Gray - represents stone/rock
+    paper: "#ffffff", // White - represents paper sheet
+    scissors: "#ff0000", // Red - represents sharp metal blades
+    lizard: "#00ff00", // Green - represents reptilian creature
+    spock: "#ffff00", // Yellow - represents Vulcan salute
   },
   // Axis color for oscilloscope-style graph (classic green CRT display)
-  AXIS_COLOR: '#00ff00',
+  AXIS_COLOR: "#00ff00",
   // ND-filter overlay for subtle UI darkening effect
-  ND_FILTER_COLOR: 'rgba(0, 0, 0, 0.4)',
+  ND_FILTER_COLOR: "rgba(0, 0, 0, 0.4)",
   // Health bar colors for entity lifespan visualization
-  HEALTH_BAR_BACKGROUND: 'rgba(255,255,255,0.5)', // Semi-transparent white outline
-  HEALTH_BAR_GREEN: 'rgba(0,255,0,0.5)', // Green for healthy entities (>50% life)
-  HEALTH_BAR_YELLOW: 'rgba(255,255,0,0.5)', // Yellow for warning state (25-50% life)
-  HEALTH_BAR_RED: 'rgba(255,0,0,0.5)', // Red for critical state (<25% life)
+  HEALTH_BAR_BACKGROUND: "rgba(255,255,255,0.5)", // Semi-transparent white outline
+  HEALTH_BAR_GREEN: "rgba(0,255,0,0.5)", // Green for healthy entities (>50% life)
+  HEALTH_BAR_YELLOW: "rgba(255,255,0,0.5)", // Yellow for warning state (25-50% life)
+  HEALTH_BAR_RED: "rgba(255,0,0,0.5)", // Red for critical state (<25% life)
   // Stats panel text colors
-  STATS_TEXT: 'white', // Default text color for statistics
-  STATS_TITLE: 'white' // Title color for stats panel
+  STATS_TEXT: "white", // Default text color for statistics
+  STATS_TITLE: "white", // Title color for stats panel
 };
 
-const canvas = document.getElementById('simulationCanvas');
-const ctx = canvas.getContext('2d');
+const canvas = document.getElementById("simulationCanvas");
+const ctx = canvas.getContext("2d");
 canvas.style.zIndex = `${CONFIG.SIMULATION_Z_INDEX}`;
-const statsCanvas = document.getElementById('statsCanvas');
-const statsCtx = statsCanvas.getContext('2d');
-const graphCanvas = document.getElementById('graphCanvas');
-const graphCtx = graphCanvas.getContext('2d');
+const statsCanvas = document.getElementById("statsCanvas");
+const statsCtx = statsCanvas.getContext("2d");
+const graphCanvas = document.getElementById("graphCanvas");
+const graphCtx = graphCanvas.getContext("2d");
 
 let lastGraphUpdateFrame = 0;
 let lastUIUpdateTime = 0;
 let prevWidth = window.innerWidth;
 let prevHeight = window.innerHeight;
-
 
 function resizeSimulationCanvas() {
   canvas.width = window.innerWidth;
@@ -103,17 +112,22 @@ function resizeSimulationCanvas() {
 }
 
 function resizeUI(currentTime, frameCount) {
-  if (typeof frameCount === 'undefined') return; // Skip during initialization
+  if (typeof frameCount === "undefined") return; // Skip during initialization
 
   // Resize graph canvas using responsive dimensions
-  const { baseWidth: graphBaseWidth, baseHeight: graphBaseHeight } = calculateDimensions(currentTime);
+  const { baseWidth: graphBaseWidth, baseHeight: graphBaseHeight } =
+    calculateDimensions(currentTime);
   graphCanvas.width = graphBaseWidth;
   graphCanvas.height = graphBaseHeight;
 
   // Resize stats canvas using responsive logic
   const isMobile = window.innerWidth <= CONFIG.MOBILE_BREAKPOINT;
-  const statsWidth = isMobile ? window.innerWidth * CONFIG.STATS_MOBILE_WIDTH_PCT : 250;
-  const statsHeight = isMobile ? window.innerHeight * CONFIG.STATS_MOBILE_HEIGHT_PCT : 200;
+  const statsWidth = isMobile
+    ? window.innerWidth * CONFIG.STATS_MOBILE_WIDTH_PCT
+    : 250;
+  const statsHeight = isMobile
+    ? window.innerHeight * CONFIG.STATS_MOBILE_HEIGHT_PCT
+    : 200;
   statsCanvas.width = statsWidth;
   statsCanvas.height = statsHeight;
 
@@ -127,18 +141,19 @@ function resizeUI(currentTime, frameCount) {
 }
 
 function resizeCanvas() {
-  const currentTime = typeof frameCount !== 'undefined' ? frameCount / CONFIG.FPS : 0;
+  const currentTime =
+    typeof frameCount !== "undefined" ? frameCount / CONFIG.FPS : 0;
 
   // Always resize simulation canvas
   resizeSimulationCanvas();
 
   // Only resize UI after initialization
-  if (typeof frameCount !== 'undefined') {
+  if (typeof frameCount !== "undefined") {
     resizeUI(currentTime, frameCount);
   }
 }
 
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener("resize", resizeCanvas);
 resizeSimulationCanvas(); // Initial call - only simulation canvas
 
 const MAX_AGE_FRAMES = CONFIG.MAX_AGE_SECONDS * CONFIG.FPS;
@@ -146,27 +161,346 @@ const MAX_AGE_FRAMES = CONFIG.MAX_AGE_SECONDS * CONFIG.FPS;
 let nextGroupId = 1;
 let frameCount = 0;
 
-const TYPES = ['rock', 'paper', 'scissors', 'lizard', 'spock'];
+const TYPES = ["rock", "paper", "scissors", "lizard", "spock"];
 const SYMBOLS = {
-  rock: '🪨',
-  paper: '📄',
-  scissors: '✂️',
-  lizard: '🦎',
-  spock: '🖖'
+  rock: "🪨",
+  paper: "📄",
+  scissors: "✂️",
+  lizard: "🦎",
+  spock: "🖖",
 };
 
 const beats = {
-  rock: ['scissors', 'lizard'],
-  paper: ['rock', 'spock'],
-  scissors: ['paper', 'lizard'],
-  lizard: ['paper', 'spock'],
-  spock: ['scissors', 'rock']
+  rock: ["scissors", "lizard"],
+  paper: ["rock", "spock"],
+  scissors: ["paper", "lizard"],
+  lizard: ["paper", "spock"],
+  spock: ["scissors", "rock"],
 };
 
 function groupColor(groupId) {
   const hue = (groupId * 137) % 360;
   return `hsl(${hue}, 80%, 50%)`;
 }
+
+/**
+ * @class Particle
+ * @description Represents a single particle for visual effects.
+ * Particles have position, velocity, color, size, and lifespan.
+ * Used for collision sparks, death effects, spawn effects, and conversion rings.
+ *
+ * @property {number} x - Current X position
+ * @property {number} y - Current Y position
+ * @property {number} vx - X velocity component
+ * @property {number} vy - Y velocity component
+ * @property {string} color - Particle color (HSL string)
+ * @property {number} size - Particle radius in pixels
+ * @property {number} life - Remaining lifespan in frames
+ * @property {number} maxLife - Initial lifespan for alpha calculation
+ * @property {string} type - Particle type: 'spark', 'explosion', 'ring', 'trail'
+ */
+class Particle {
+  /**
+   * @constructor
+   * @param {number} x - Initial X position
+   * @param {number} y - Initial Y position
+   * @param {number} vx - Initial X velocity
+   * @param {number} vy - Initial Y velocity
+   * @param {string} color - Particle color
+   * @param {number} size - Particle size in pixels
+   * @param {number} life - Lifespan in frames
+   * @param {string} type - Particle type (spark, explosion, ring, trail)
+   */
+  constructor(x, y, vx, vy, color, size, life, type = "spark") {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.color = color;
+    this.size = Math.max(0.5, size);
+    this.life = life;
+    this.maxLife = life;
+    this.type = type;
+  }
+
+  /**
+   * @method update
+   * @description Updates particle position, applies physics, and decrements life.
+   */
+  update() {
+    // Apply velocity
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Apply gravity for spark and explosion types
+    if (this.type === "spark" || this.type === "explosion") {
+      this.vy += CONFIG.PARTICLE_GRAVITY;
+    }
+
+    // Apply friction
+    this.vx *= CONFIG.PARTICLE_FRICTION;
+    this.vy *= CONFIG.PARTICLE_FRICTION;
+
+    // Decrement life
+    this.life--;
+  }
+
+  /**
+   * @method draw
+   * @param {CanvasRenderingContext2D} ctx - Canvas context for rendering
+   * @description Renders the particle with fade effect based on remaining life.
+   */
+  draw(ctx) {
+    const alpha = Math.max(0, this.life / this.maxLife);
+    const currentSize = this.size * alpha;
+
+    if (currentSize < 0.5) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    if (this.type === "ring") {
+      // Draw expanding ring
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = Math.max(1, 2 * alpha);
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, Math.max(1, currentSize * 10), 0, 2 * Math.PI);
+      ctx.stroke();
+    } else {
+      // Draw particle with glow
+      ctx.shadowColor = this.color;
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, Math.max(0.5, currentSize), 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * @method isDead
+   * @returns {boolean} True if particle should be removed
+   */
+  isDead() {
+    return this.life <= 0;
+  }
+}
+
+/**
+ * @class ParticleManager
+ * @description Manages all particles in the simulation.
+ * Handles particle creation, updates, rendering, and cleanup.
+ * Implements particle pooling for performance optimization.
+ *
+ * @property {Particle[]} particles - Array of active particles
+ * @property {number} maxParticles - Maximum allowed particles
+ */
+class ParticleManager {
+  /**
+   * @constructor
+   */
+  constructor() {
+    this.particles = [];
+    this.maxParticles = CONFIG.PARTICLE_LIMIT;
+  }
+
+  /**
+   * @method spawnCollisionSparks
+   * @param {number} x - Collision X position
+   * @param {number} y - Collision Y position
+   * @param {string} color1 - First entity's group color
+   * @param {string} color2 - Second entity's group color
+   * @description Creates spark particles flying outward from collision point.
+   */
+  spawnCollisionSparks(x, y, color1, color2) {
+    const count = CONFIG.COLLISION_SPARK_COUNT;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const speed = 2 + Math.random() * 2;
+      const color = Math.random() > 0.5 ? color1 : color2;
+      const size = 2 + Math.random() * 2;
+      const life = 20 + Math.floor(Math.random() * 10);
+
+      this.addParticle(
+        new Particle(
+          x,
+          y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          size,
+          life,
+          "spark",
+        ),
+      );
+    }
+  }
+
+  /**
+   * @method spawnConversionRing
+   * @param {number} x - Conversion X position
+   * @param {number} y - Conversion Y position
+   * @param {string} fromColor - Original entity's group color
+   * @param {string} toColor - New entity's group color
+   * @description Creates expanding ring effect for entity conversion.
+   */
+  spawnConversionRing(x, y, fromColor, toColor) {
+    // Create expanding ring particles
+    const ringCount = 8;
+    for (let i = 0; i < ringCount; i++) {
+      const angle = (Math.PI * 2 * i) / ringCount;
+      const speed = CONFIG.CONVERSION_RING_SPEED;
+      const life = 25;
+      const color = i % 2 === 0 ? fromColor : toColor;
+
+      this.addParticle(
+        new Particle(
+          x,
+          y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          3,
+          life,
+          "ring",
+        ),
+      );
+    }
+
+    // Add some spark particles for extra effect
+    for (let i = 0; i < 5; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 2;
+      const color = Math.random() > 0.5 ? fromColor : toColor;
+
+      this.addParticle(
+        new Particle(
+          x,
+          y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          2,
+          20,
+          "spark",
+        ),
+      );
+    }
+  }
+
+  /**
+   * @method spawnDeathEffect
+   * @param {number} x - Death X position
+   * @param {number} y - Death Y position
+   * @param {string} color - Entity's group color
+   * @description Creates implosion effect when entity dies.
+   */
+  spawnDeathEffect(x, y, color) {
+    const count = CONFIG.DEATH_PARTICLE_COUNT;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 20 + Math.random() * 30;
+      const startX = x + Math.cos(angle) * distance;
+      const startY = y + Math.sin(angle) * distance;
+
+      // Velocity toward center (implosion)
+      const speed = 1 + Math.random() * 2;
+      const life = 30 + Math.floor(Math.random() * 15);
+      const size = 3 + Math.random() * 2;
+
+      this.addParticle(
+        new Particle(
+          startX,
+          startY,
+          -Math.cos(angle) * speed,
+          -Math.sin(angle) * speed,
+          color,
+          size,
+          life,
+          "explosion",
+        ),
+      );
+    }
+  }
+
+  /**
+   * @method spawnSpawnEffect
+   * @param {number} x - Spawn X position
+   * @param {number} y - Spawn Y position
+   * @param {string} color - Entity's group color
+   * @description Creates burst effect when new entity spawns.
+   */
+  spawnSpawnEffect(x, y, color) {
+    const count = CONFIG.SPAWN_PARTICLE_COUNT;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+      const speed = 2 + Math.random() * 2;
+      const life = 20 + Math.floor(Math.random() * 10);
+      const size = 2 + Math.random() * 2;
+
+      this.addParticle(
+        new Particle(
+          x,
+          y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          size,
+          life,
+          "spark",
+        ),
+      );
+    }
+  }
+
+  /**
+   * @method addParticle
+   * @param {Particle} particle - Particle to add
+   * @description Adds a particle, respecting the maximum limit.
+   */
+  addParticle(particle) {
+    if (this.particles.length < this.maxParticles) {
+      this.particles.push(particle);
+    }
+  }
+
+  /**
+   * @method update
+   * @description Updates all particles and removes dead ones.
+   */
+  update() {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      this.particles[i].update();
+      if (this.particles[i].isDead()) {
+        this.particles.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * @method draw
+   * @param {CanvasRenderingContext2D} ctx - Canvas context for rendering
+   * @description Renders all active particles.
+   */
+  draw(ctx) {
+    for (const particle of this.particles) {
+      particle.draw(ctx);
+    }
+  }
+
+  /**
+   * @method clear
+   * @description Removes all particles.
+   */
+  clear() {
+    this.particles = [];
+  }
+}
+
+// Global particle manager instance
+const particleManager = new ParticleManager();
 
 /**
  * @class Entity
@@ -209,6 +543,7 @@ class Entity {
     this.age = 0;
     this.maxAge = MAX_AGE_FRAMES;
     this.lastDamageFrame = -Infinity;
+    this.trail = []; // Array of {x, y} positions for motion trail
   }
 
   /**
@@ -219,18 +554,34 @@ class Entity {
    */
   update() {
     // Validate and update position with bounds checking
-    this.x = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.width - CONFIG.ENTITY_RADIUS, this.x + this.vx));
-    this.y = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.height - CONFIG.ENTITY_RADIUS, this.y + this.vy));
+    this.x = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.width - CONFIG.ENTITY_RADIUS, this.x + this.vx),
+    );
+    this.y = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.height - CONFIG.ENTITY_RADIUS, this.y + this.vy),
+    );
 
     // Apply edge forces with speed limits
-    if (this.x < CONFIG.EDGE_MARGIN) this.vx = Math.min(this.vx + CONFIG.EDGE_FORCE, CONFIG.MAX_SPEED);
-    else if (this.x > canvas.width - CONFIG.EDGE_MARGIN) this.vx = Math.max(this.vx - CONFIG.EDGE_FORCE, -CONFIG.MAX_SPEED);
-    if (this.y < CONFIG.EDGE_MARGIN) this.vy = Math.min(this.vy + CONFIG.EDGE_FORCE, CONFIG.MAX_SPEED);
-    else if (this.y > canvas.height - CONFIG.EDGE_MARGIN) this.vy = Math.max(this.vy - CONFIG.EDGE_FORCE, -CONFIG.MAX_SPEED);
+    if (this.x < CONFIG.EDGE_MARGIN)
+      this.vx = Math.min(this.vx + CONFIG.EDGE_FORCE, CONFIG.MAX_SPEED);
+    else if (this.x > canvas.width - CONFIG.EDGE_MARGIN)
+      this.vx = Math.max(this.vx - CONFIG.EDGE_FORCE, -CONFIG.MAX_SPEED);
+    if (this.y < CONFIG.EDGE_MARGIN)
+      this.vy = Math.min(this.vy + CONFIG.EDGE_FORCE, CONFIG.MAX_SPEED);
+    else if (this.y > canvas.height - CONFIG.EDGE_MARGIN)
+      this.vy = Math.max(this.vy - CONFIG.EDGE_FORCE, -CONFIG.MAX_SPEED);
 
     // Final strict bounds clamping
-    this.x = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.width - CONFIG.ENTITY_RADIUS, this.x));
-    this.y = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.height - CONFIG.ENTITY_RADIUS, this.y));
+    this.x = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.width - CONFIG.ENTITY_RADIUS, this.x),
+    );
+    this.y = Math.max(
+      CONFIG.ENTITY_RADIUS,
+      Math.min(canvas.height - CONFIG.ENTITY_RADIUS, this.y),
+    );
 
     // Validate and adjust speed within acceptable range
     let speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
@@ -239,17 +590,74 @@ class Entity {
     if (speed < CONFIG.TARGET_SPEED) {
       // Gradually accelerate towards target speed
       const scale = 1 + CONFIG.SPEED_ADJUST_FACTOR;
-      this.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, this.vx * scale));
-      this.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, this.vy * scale));
+      this.vx = Math.max(
+        -CONFIG.MAX_SPEED,
+        Math.min(CONFIG.MAX_SPEED, this.vx * scale),
+      );
+      this.vy = Math.max(
+        -CONFIG.MAX_SPEED,
+        Math.min(CONFIG.MAX_SPEED, this.vy * scale),
+      );
     } else if (speed > CONFIG.MAX_SPEED) {
       // Cap speed at maximum allowed value
       const scale = CONFIG.MAX_SPEED / speed;
-      this.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, this.vx * scale));
-      this.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, this.vy * scale));
+      this.vx = Math.max(
+        -CONFIG.MAX_SPEED,
+        Math.min(CONFIG.MAX_SPEED, this.vx * scale),
+      );
+      this.vy = Math.max(
+        -CONFIG.MAX_SPEED,
+        Math.min(CONFIG.MAX_SPEED, this.vy * scale),
+      );
     }
 
     // Increment and clamp age within valid range
     this.age = Math.max(0, Math.min(this.age + 1, this.maxAge));
+
+    // Update motion trail
+    this.updateTrail();
+  }
+
+  /**
+   * @method updateTrail
+   * @description Updates the motion trail by storing current position and removing old positions.
+   */
+  updateTrail() {
+    this.trail.unshift({ x: this.x, y: this.y });
+    if (this.trail.length > CONFIG.TRAIL_LENGTH) {
+      this.trail.pop();
+    }
+  }
+
+  /**
+   * @method drawTrail
+   * @param {CanvasRenderingContext2D} ctx - Canvas 2D context for rendering
+   * @description Renders the motion trail behind the entity with fading effect.
+   */
+  drawTrail(ctx) {
+    if (this.trail.length < 2) return;
+
+    const hue = (this.groupId * 137) % 360;
+    ctx.save();
+
+    for (let i = 0; i < this.trail.length - 1; i++) {
+      const alpha = (1 - i / this.trail.length) * 0.3;
+      const size = CONFIG.ENTITY_RADIUS * 0.5 * (1 - i / this.trail.length);
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = `hsl(${hue}, 80%, 50%)`;
+      ctx.beginPath();
+      ctx.arc(
+        this.trail[i].x,
+        this.trail[i].y,
+        Math.max(1, size),
+        0,
+        2 * Math.PI,
+      );
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
   /**
@@ -260,8 +668,14 @@ class Entity {
    * Includes validation for health ratio to prevent rendering artifacts.
    */
   draw(ctx) {
+    // Draw motion trail first (behind entity)
+    this.drawTrail(ctx);
+
     // Validate health ratio (0-1 range)
-    const healthRatio = Math.max(0, Math.min(1, (this.maxAge - this.age) / this.maxAge));
+    const healthRatio = Math.max(
+      0,
+      Math.min(1, (this.maxAge - this.age) / this.maxAge),
+    );
 
     // Draw group-colored glow effect
     ctx.save();
@@ -276,9 +690,9 @@ class Entity {
 
     // Draw main entity symbol
     ctx.globalAlpha = 1.0;
-    ctx.font = '30px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.font = "30px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.fillText(SYMBOLS[this.type], this.x, this.y);
 
     // Draw health bar above entity
@@ -353,22 +767,31 @@ function computeStats() {
     stats[type] = {
       count: 0,
       totalHealth: 0,
-      avgHealth: 0 // Initialize to prevent undefined access
+      avgHealth: 0, // Initialize to prevent undefined access
     };
   }
 
   // Aggregate health data from all valid entities
   for (const entity of entities) {
     if (!entity || entity.age < 0 || entity.maxAge <= 0) continue;
-    const health = Math.max(0, Math.min(1, (entity.maxAge - entity.age) / entity.maxAge));
+    const health = Math.max(
+      0,
+      Math.min(1, (entity.maxAge - entity.age) / entity.maxAge),
+    );
     stats[entity.type].count = Math.max(0, stats[entity.type].count + 1);
-    stats[entity.type].totalHealth = Math.max(0, stats[entity.type].totalHealth + health);
+    stats[entity.type].totalHealth = Math.max(
+      0,
+      stats[entity.type].totalHealth + health,
+    );
   }
 
   // Calculate average health for each type with validation
   for (const type of TYPES) {
     if (stats[type].count > 0) {
-      stats[type].avgHealth = Math.max(0, Math.min(1, stats[type].totalHealth / stats[type].count));
+      stats[type].avgHealth = Math.max(
+        0,
+        Math.min(1, stats[type].totalHealth / stats[type].count),
+      );
     } else {
       stats[type].avgHealth = 0;
     }
@@ -391,29 +814,34 @@ function computeStats() {
 function updateGraphHistory(stats, currentTime) {
   try {
     // Validate input parameters
-    if (!stats || typeof currentTime !== 'number' || currentTime < 0) {
-      console.warn('Invalid parameters for updateGraphHistory');
+    if (!stats || typeof currentTime !== "number" || currentTime < 0) {
+      console.warn("Invalid parameters for updateGraphHistory");
       return;
     }
 
     // Calculate adjusted count (population weighted by average health) for each type
     for (const type of TYPES) {
-      const adjustedCount = Math.max(0, stats[type].count * stats[type].avgHealth);
+      const adjustedCount = Math.max(
+        0,
+        stats[type].count * stats[type].avgHealth,
+      );
 
       // Add new data point with timestamp to history array
       typeHistory[type].push({
         time: currentTime,
-        value: adjustedCount
+        value: adjustedCount,
       });
 
       // Maintain sliding window: remove data points older than time window
-      while (typeHistory[type].length > 0 &&
-             currentTime - typeHistory[type][0].time > CONFIG.TIME_WINDOW_SECONDS) {
+      while (
+        typeHistory[type].length > 0 &&
+        currentTime - typeHistory[type][0].time > CONFIG.TIME_WINDOW_SECONDS
+      ) {
         typeHistory[type].shift();
       }
     }
   } catch (error) {
-    console.warn('Error updating graph history:', error);
+    console.warn("Error updating graph history:", error);
   }
 }
 
@@ -437,42 +865,73 @@ function updateGraphHistory(stats, currentTime) {
  */
 function drawGraph(currentTime) {
   if (!graphCtx) {
-    console.warn('Graph context not available');
+    console.warn("Graph context not available");
     return;
   }
 
   try {
     // Calculate responsive dimensions and scaling factors
-    const { baseWidth, baseHeight, graphWidth, graphHeight, xStart, yStart, iconX, iconSize, fontSize, timeScale, maxY, minY, yRange, isMobile, isVerySmall } = calculateDimensions(currentTime);
+    const {
+      baseWidth,
+      baseHeight,
+      graphWidth,
+      graphHeight,
+      xStart,
+      yStart,
+      iconX,
+      iconSize,
+      fontSize,
+      timeScale,
+      maxY,
+      minY,
+      yRange,
+      isMobile,
+      isVerySmall,
+    } = calculateDimensions(currentTime);
 
     // Set canvas dimensions and positioning styles
     graphCanvas.width = baseWidth;
     graphCanvas.height = baseHeight;
-    graphCanvas.style.position = 'absolute';
-    graphCanvas.style.top = '10px';
-    graphCanvas.style.left = isMobile ? '2.5%' : '10px';
+    graphCanvas.style.position = "absolute";
+    graphCanvas.style.top = "10px";
+    graphCanvas.style.left = isMobile ? "2.5%" : "10px";
     graphCanvas.style.background = `rgba(0,0,0,0.4)`;
-    graphCanvas.style.borderRadius = isMobile ? '8px' : '4px';
-    graphCanvas.style.padding = isMobile ? '5px' : '5px';
+    graphCanvas.style.borderRadius = isMobile ? "8px" : "4px";
+    graphCanvas.style.padding = isMobile ? "5px" : "5px";
 
     // Clear canvas and render graph components
     graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
 
     drawAxes(graphWidth, graphHeight, xStart, yStart);
 
-    const lastPoints = drawTraces(graphWidth, graphHeight, xStart, yStart, timeScale, minY, yRange, maxY, currentTime, isMobile);
+    const lastPoints = drawTraces(
+      graphWidth,
+      graphHeight,
+      xStart,
+      yStart,
+      timeScale,
+      minY,
+      yRange,
+      maxY,
+      currentTime,
+      isMobile,
+    );
 
     drawIcons(lastPoints, iconX, iconSize);
 
     // Draw time window label at bottom center
     graphCtx.fillStyle = COLORS.AXIS_COLOR;
     graphCtx.font = `${fontSize}px monospace`;
-    graphCtx.textAlign = 'center';
-    graphCtx.fillText('1 min window', xStart + graphWidth/2, yStart + graphHeight + 15);
+    graphCtx.textAlign = "center";
+    graphCtx.fillText(
+      "1 min window",
+      xStart + graphWidth / 2,
+      yStart + graphHeight + 15,
+    );
 
     applyOverlay();
   } catch (error) {
-    console.warn('Error drawing graph:', error);
+    console.warn("Error drawing graph:", error);
   }
 }
 
@@ -506,10 +965,14 @@ function calculateDimensions(currentTime) {
   const isVerySmall = window.innerWidth <= CONFIG.VERY_SMALL_BREAKPOINT;
 
   // Calculate base canvas dimensions based on device type
-  const baseWidth = isMobile ? window.innerWidth * CONFIG.GRAPH_MOBILE_WIDTH_PCT : 450;
-  const baseHeight = isVerySmall ? window.innerHeight * CONFIG.GRAPH_VERY_SMALL_HEIGHT_PCT :
-                   isMobile ? window.innerHeight * CONFIG.GRAPH_MOBILE_HEIGHT_PCT :
-                   window.innerHeight * CONFIG.GRAPH_DESKTOP_HEIGHT_PCT;
+  const baseWidth = isMobile
+    ? window.innerWidth * CONFIG.GRAPH_MOBILE_WIDTH_PCT
+    : 450;
+  const baseHeight = isVerySmall
+    ? window.innerHeight * CONFIG.GRAPH_VERY_SMALL_HEIGHT_PCT
+    : isMobile
+      ? window.innerHeight * CONFIG.GRAPH_MOBILE_HEIGHT_PCT
+      : window.innerHeight * CONFIG.GRAPH_DESKTOP_HEIGHT_PCT;
 
   // Calculate inner graph plotting area (subtract padding/margins)
   const graphWidth = baseWidth - (isMobile ? 20 : 70); // Less space needed on mobile
@@ -521,10 +984,16 @@ function calculateDimensions(currentTime) {
   const iconX = isMobile ? xStart + graphWidth + 5 : xStart + graphWidth + 10;
 
   // Responsive sizing for icons and fonts
-  const iconSize = isVerySmall ? CONFIG.ICON_VERY_SMALL_SIZE :
-                   isMobile ? CONFIG.ICON_MOBILE_SIZE : CONFIG.ICON_DESKTOP_SIZE;
-  const fontSize = isVerySmall ? CONFIG.FONT_VERY_SMALL_SIZE :
-                   isMobile ? CONFIG.FONT_MOBILE_SIZE : CONFIG.FONT_DESKTOP_SIZE;
+  const iconSize = isVerySmall
+    ? CONFIG.ICON_VERY_SMALL_SIZE
+    : isMobile
+      ? CONFIG.ICON_MOBILE_SIZE
+      : CONFIG.ICON_DESKTOP_SIZE;
+  const fontSize = isVerySmall
+    ? CONFIG.FONT_VERY_SMALL_SIZE
+    : isMobile
+      ? CONFIG.FONT_MOBILE_SIZE
+      : CONFIG.FONT_DESKTOP_SIZE;
 
   // Fixed time scale: entire x-axis represents 1 minute of data
   const timeScale = graphWidth / CONFIG.TIME_WINDOW_SECONDS;
@@ -535,10 +1004,12 @@ function calculateDimensions(currentTime) {
 
   try {
     // Attempt data-dependent scaling only after all globals are initialized
-    if (typeof TYPES !== 'undefined') {
+    if (typeof TYPES !== "undefined") {
       for (const type of TYPES) {
         if (typeHistory && typeHistory[type] && typeHistory[type].length > 0) {
-          const values = typeHistory[type].map(point => point ? point.value || 0 : 0);
+          const values = typeHistory[type].map((point) =>
+            point ? point.value || 0 : 0,
+          );
           if (values.length > 0) {
             maxY = Math.max(maxY, ...values);
             minY = Math.min(minY, ...values);
@@ -548,7 +1019,7 @@ function calculateDimensions(currentTime) {
     }
   } catch (error) {
     // During initialization, use defaults if globals not ready
-    console.warn('Skipping graph scaling during initialization:', error);
+    console.warn("Skipping graph scaling during initialization:", error);
     maxY = CONFIG.GRAPH_DEFAULT_MAX_Y;
     minY = 0;
   }
@@ -571,7 +1042,7 @@ function calculateDimensions(currentTime) {
     minY,
     yRange,
     isMobile,
-    isVerySmall
+    isVerySmall,
   };
 }
 
@@ -614,7 +1085,18 @@ function drawAxes(graphWidth, graphHeight, xStart, yStart) {
  *
  * @throws {Error} Logs warning and returns empty object if rendering fails
  */
-function drawTraces(graphWidth, graphHeight, xStart, yStart, timeScale, minY, yRange, maxY, currentTime, isMobile) {
+function drawTraces(
+  graphWidth,
+  graphHeight,
+  xStart,
+  yStart,
+  timeScale,
+  minY,
+  yRange,
+  maxY,
+  currentTime,
+  isMobile,
+) {
   try {
     // Draw oscilloscope-style traces for each RPSLS type
     const typeColors = COLORS.GRAPH_LINE_COLORS;
@@ -637,15 +1119,22 @@ function drawTraces(graphWidth, graphHeight, xStart, yStart, timeScale, minY, yR
       // Draw continuous line from oldest (left) to newest (right) data point
       for (let i = 0; i < history.length; i++) {
         const point = history[i];
-        if (!point || typeof point.time === 'undefined' || typeof point.value === 'undefined') continue;
+        if (
+          !point ||
+          typeof point.time === "undefined" ||
+          typeof point.value === "undefined"
+        )
+          continue;
 
         const timeOffset = currentTime - point.time;
         if (yRange <= 0) continue; // Prevent division by zero in Y scaling
 
         // Calculate screen coordinates (time flows left to right)
-        const x = xStart + (CONFIG.TIME_WINDOW_SECONDS - timeOffset) * timeScale;
+        const x =
+          xStart + (CONFIG.TIME_WINDOW_SECONDS - timeOffset) * timeScale;
         const yValue = point.value;
-        const y = yStart + graphHeight - ((yValue - minY) / yRange) * graphHeight;
+        const y =
+          yStart + graphHeight - ((yValue - minY) / yRange) * graphHeight;
 
         if (i === 0) {
           graphCtx.moveTo(x, y); // Start of line
@@ -666,7 +1155,7 @@ function drawTraces(graphWidth, graphHeight, xStart, yStart, timeScale, minY, yR
 
     return lastPoints;
   } catch (error) {
-    console.warn('Error drawing traces:', error);
+    console.warn("Error drawing traces:", error);
     return {}; // Return empty object to prevent icon positioning errors
   }
 }
@@ -683,8 +1172,8 @@ function drawTraces(graphWidth, graphHeight, xStart, yStart, timeScale, minY, yR
 function drawIcons(lastPoints, iconX, iconSize) {
   // Draw mini icons at the height of the last drawn point for each type
   graphCtx.font = `${iconSize}px sans-serif`;
-  graphCtx.textAlign = 'center';
-  graphCtx.textBaseline = 'middle';
+  graphCtx.textAlign = "center";
+  graphCtx.textBaseline = "middle";
 
   for (const type of TYPES) {
     if (lastPoints[type]) {
@@ -709,11 +1198,13 @@ function applyOverlay() {
 
 let entities = [];
 
-
-
 function spawnEntity() {
-  const x = Math.random() * (canvas.width - 2 * CONFIG.ENTITY_RADIUS) + CONFIG.ENTITY_RADIUS;
-  const y = Math.random() * (canvas.height - 2 * CONFIG.ENTITY_RADIUS) + CONFIG.ENTITY_RADIUS;
+  const x =
+    Math.random() * (canvas.width - 2 * CONFIG.ENTITY_RADIUS) +
+    CONFIG.ENTITY_RADIUS;
+  const y =
+    Math.random() * (canvas.height - 2 * CONFIG.ENTITY_RADIUS) +
+    CONFIG.ENTITY_RADIUS;
   const angle = Math.random() * 2 * Math.PI;
   const vx = Math.cos(angle) * CONFIG.INITIAL_SPEED;
   const vy = Math.sin(angle) * CONFIG.INITIAL_SPEED;
@@ -742,7 +1233,14 @@ function spawnEntity() {
 function initEntities() {
   entities = [];
   for (let i = 0; i < CONFIG.INITIAL_ENTITY_COUNT; i++) {
-    entities.push(spawnEntity());
+    const entity = spawnEntity();
+    entities.push(entity);
+    // Spawn effect for initial entities
+    particleManager.spawnSpawnEffect(
+      entity.x,
+      entity.y,
+      groupColor(entity.groupId),
+    );
   }
 }
 
@@ -846,26 +1344,65 @@ function resolveCollisions() {
         const ny = dy / dist;
 
         if (e1.groupId === e2.groupId) {
-          if (dist > 2 * CONFIG.HITBOX_RADIUS * 1.2 && dist < CONFIG.MAX_ATTRACT_DIST) {
+          if (
+            dist > 2 * CONFIG.HITBOX_RADIUS * 1.2 &&
+            dist < CONFIG.MAX_ATTRACT_DIST
+          ) {
             const force = 0.01;
-            e1.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e1.vx - nx * force));
-            e1.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e1.vy - ny * force));
-            e2.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e2.vx + nx * force));
-            e2.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e2.vy + ny * force));
+            e1.vx = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e1.vx - nx * force),
+            );
+            e1.vy = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e1.vy - ny * force),
+            );
+            e2.vx = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e2.vx + nx * force),
+            );
+            e2.vy = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e2.vy + ny * force),
+            );
           } else if (dist < 2 * CONFIG.HITBOX_RADIUS * 1.2) {
             const force = 0.08;
-            e1.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e1.vx + nx * force));
-            e1.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e1.vy + ny * force));
-            e2.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e2.vx - nx * force));
-            e2.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e2.vy - ny * force));
+            e1.vx = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e1.vx + nx * force),
+            );
+            e1.vy = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e1.vy + ny * force),
+            );
+            e2.vx = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e2.vx - nx * force),
+            );
+            e2.vy = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e2.vy - ny * force),
+            );
           }
         } else {
           if (dist < CONFIG.MAX_ATTRACT_DIST) {
             const force = 0.005;
-            e1.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e1.vx + nx * force));
-            e1.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e1.vy + ny * force));
-            e2.vx = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e2.vx - nx * force));
-            e2.vy = Math.max(-CONFIG.MAX_SPEED, Math.min(CONFIG.MAX_SPEED, e2.vy - ny * force));
+            e1.vx = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e1.vx + nx * force),
+            );
+            e1.vy = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e1.vy + ny * force),
+            );
+            e2.vx = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e2.vx - nx * force),
+            );
+            e2.vy = Math.max(
+              -CONFIG.MAX_SPEED,
+              Math.min(CONFIG.MAX_SPEED, e2.vy - ny * force),
+            );
           }
         }
 
@@ -874,10 +1411,22 @@ function resolveCollisions() {
           const overlap = Math.min(minDist - dist, minDist * 0.5); // Limit correction amount
           const correctionX = (nx * overlap) / 2;
           const correctionY = (ny * overlap) / 2;
-          e1.x = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e1.x + correctionX));
-          e1.y = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e1.y + correctionY));
-          e2.x = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e2.x - correctionX));
-          e2.y = Math.max(CONFIG.ENTITY_RADIUS, Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e2.y - correctionY));
+          e1.x = Math.max(
+            CONFIG.ENTITY_RADIUS,
+            Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e1.x + correctionX),
+          );
+          e1.y = Math.max(
+            CONFIG.ENTITY_RADIUS,
+            Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e1.y + correctionY),
+          );
+          e2.x = Math.max(
+            CONFIG.ENTITY_RADIUS,
+            Math.min(canvas.width - CONFIG.ENTITY_RADIUS, e2.x - correctionX),
+          );
+          e2.y = Math.max(
+            CONFIG.ENTITY_RADIUS,
+            Math.min(canvas.height - CONFIG.ENTITY_RADIUS, e2.y - correctionY),
+          );
         }
       }
 
@@ -896,8 +1445,18 @@ function resolveCollisions() {
           }
 
           // Check if groups should merge
-          const group1Size = Math.max(0, entities.filter(e => e.type === e1.type && e.groupId === e1.groupId).length);
-          const group2Size = Math.max(0, entities.filter(e => e.type === e2.type && e.groupId === e2.groupId).length);
+          const group1Size = Math.max(
+            0,
+            entities.filter(
+              (e) => e.type === e1.type && e.groupId === e1.groupId,
+            ).length,
+          );
+          const group2Size = Math.max(
+            0,
+            entities.filter(
+              (e) => e.type === e2.type && e.groupId === e2.groupId,
+            ).length,
+          );
           if (group1Size + group2Size <= 7) {
             const oldGroupId = e2.groupId;
             const newGroupId = e1.groupId;
@@ -915,7 +1474,22 @@ function resolveCollisions() {
 
   for (let i = 0; i < entities.length; i++) {
     if (entities[i].isDead()) {
-      entities[i] = spawnEntity();
+      // Spawn death effect for the dying entity
+      const deadEntity = entities[i];
+      particleManager.spawnDeathEffect(
+        deadEntity.x,
+        deadEntity.y,
+        groupColor(deadEntity.groupId),
+      );
+
+      // Replace with new entity and spawn effect
+      const newEntity = spawnEntity();
+      particleManager.spawnSpawnEffect(
+        newEntity.x,
+        newEntity.y,
+        groupColor(newEntity.groupId),
+      );
+      entities[i] = newEntity;
     }
   }
 }
@@ -954,14 +1528,30 @@ function redistributeHealth() {
 }
 
 function handleInteraction(e1, e2) {
+  // Get group colors for visual effects
+  const color1 = groupColor(e1.groupId);
+  const color2 = groupColor(e2.groupId);
+  const collisionX = (e1.x + e2.x) / 2;
+  const collisionY = (e1.y + e2.y) / 2;
+
   if (beats[e1.type].includes(e2.type)) {
     const hunter = e1;
     const prey = e2;
 
+    // Spawn collision sparks
+    particleManager.spawnCollisionSparks(
+      collisionX,
+      collisionY,
+      color1,
+      color2,
+    );
+
     const preyHealth = (prey.maxAge - prey.age) / prey.maxAge;
 
     // Find all group members
-    const groupMembers = entities.filter(ent => ent.groupId === hunter.groupId && ent.type === hunter.type);
+    const groupMembers = entities.filter(
+      (ent) => ent.groupId === hunter.groupId && ent.type === hunter.type,
+    );
 
     let groupTotalHealth = 0;
     for (const member of groupMembers) {
@@ -980,23 +1570,40 @@ function handleInteraction(e1, e2) {
         if (member.age < 0) member.age = 0;
       }
 
+      // Spawn death effect for prey
+      particleManager.spawnDeathEffect(prey.x, prey.y, color2);
+
       // Prey dies
       prey.age = prey.maxAge;
     } else {
+      // Store old group color for conversion effect
+      const oldColor = groupColor(prey.groupId);
+
       // Convert prey to hunter's group/type
       prey.type = hunter.type;
-      // e1.resetAge();
-      // e2.resetAge();
       prey.groupId = hunter.groupId;
+
+      // Spawn conversion ring effect
+      particleManager.spawnConversionRing(prey.x, prey.y, oldColor, color1);
     }
   } else if (beats[e2.type].includes(e1.type)) {
     const hunter2 = e2;
     const prey2 = e1;
 
+    // Spawn collision sparks
+    particleManager.spawnCollisionSparks(
+      collisionX,
+      collisionY,
+      color1,
+      color2,
+    );
+
     const prey2Health = (prey2.maxAge - prey2.age) / prey2.maxAge;
 
     // Find all group members
-    const groupMembers2 = entities.filter(ent => ent.groupId === hunter2.groupId && ent.type === hunter2.type);
+    const groupMembers2 = entities.filter(
+      (ent) => ent.groupId === hunter2.groupId && ent.type === hunter2.type,
+    );
 
     let groupTotalHealth2 = 0;
     for (const member of groupMembers2) {
@@ -1015,21 +1622,28 @@ function handleInteraction(e1, e2) {
         if (member.age < 0) member.age = 0;
       }
 
+      // Spawn death effect for prey
+      particleManager.spawnDeathEffect(prey2.x, prey2.y, color1);
+
       // Prey dies
       prey2.age = prey2.maxAge;
     } else {
+      // Store old group color for conversion effect
+      const oldColor = groupColor(prey2.groupId);
+
       // Convert prey to hunter's group/type
       prey2.type = hunter2.type;
-      // e1.resetAge();
-      // e2.resetAge();
       prey2.groupId = hunter2.groupId;
+
+      // Spawn conversion ring effect
+      particleManager.spawnConversionRing(prey2.x, prey2.y, oldColor, color2);
     }
   }
 }
 
 function updateUI(currentTime) {
   if (!statsCtx) {
-    console.warn('Stats context not available');
+    console.warn("Stats context not available");
     return;
   }
 
@@ -1044,44 +1658,56 @@ function updateUI(currentTime) {
 
     // Responsive stats canvas positioning
     const isMobile = window.innerWidth <= CONFIG.MOBILE_BREAKPOINT;
-    const statsWidth = isMobile ? window.innerWidth * CONFIG.STATS_MOBILE_WIDTH_PCT : 250;
-    const statsHeight = isMobile ? window.innerHeight * CONFIG.STATS_MOBILE_HEIGHT_PCT : 200;
+    const statsWidth = isMobile
+      ? window.innerWidth * CONFIG.STATS_MOBILE_WIDTH_PCT
+      : 250;
+    const statsHeight = isMobile
+      ? window.innerHeight * CONFIG.STATS_MOBILE_HEIGHT_PCT
+      : 200;
     const statsFontSize = isMobile ? 14 : 12;
 
     statsCanvas.width = statsWidth;
     statsCanvas.height = statsHeight;
-    statsCanvas.style.position = 'absolute';
-    statsCanvas.style.top = isMobile ? 'auto' : '10px';
-    statsCanvas.style.right = isMobile ? 'auto' : '10px';
-    statsCanvas.style.bottom = isMobile ? '10px' : 'auto';
-    statsCanvas.style.left = isMobile ? '5%' : 'auto';
-    statsCanvas.style.transform = isMobile ? 'translateX(-50%)' : 'none';
-    statsCanvas.style.background = 'rgba(0,0,0,0.4)';
-    statsCanvas.style.borderRadius = isMobile ? '12px' : '8px';
-    statsCanvas.style.padding = isMobile ? '15px' : '10px';
-    statsCanvas.style.fontFamily = 'sans-serif';
+    statsCanvas.style.position = "absolute";
+    statsCanvas.style.top = isMobile ? "auto" : "10px";
+    statsCanvas.style.right = isMobile ? "auto" : "10px";
+    statsCanvas.style.bottom = isMobile ? "10px" : "auto";
+    statsCanvas.style.left = isMobile ? "5%" : "auto";
+    statsCanvas.style.transform = isMobile ? "translateX(-50%)" : "none";
+    statsCanvas.style.background = "rgba(0,0,0,0.4)";
+    statsCanvas.style.borderRadius = isMobile ? "12px" : "8px";
+    statsCanvas.style.padding = isMobile ? "15px" : "10px";
+    statsCanvas.style.fontFamily = "sans-serif";
     statsCanvas.style.fontSize = `${statsFontSize}px`;
-    statsCanvas.style.color = 'white';
-    statsCanvas.style.textAlign = isMobile ? 'center' : 'left';
+    statsCanvas.style.color = "white";
+    statsCanvas.style.textAlign = isMobile ? "center" : "left";
 
     statsCtx.clearRect(0, 0, statsCanvas.width, statsCanvas.height);
 
     let y = 20;
     statsCtx.fillStyle = COLORS.STATS_TITLE;
     statsCtx.font = `bold ${statsFontSize + 2}px sans-serif`;
-    statsCtx.textAlign = 'center';
-    statsCtx.fillText('RPSLS Stats', statsCanvas.width / 2, y);
+    statsCtx.textAlign = "center";
+    statsCtx.fillText("RPSLS Stats", statsCanvas.width / 2, y);
     y += 25;
 
     statsCtx.fillStyle = COLORS.STATS_TEXT;
     statsCtx.font = `${statsFontSize}px sans-serif`;
-    statsCtx.textAlign = 'center';
+    statsCtx.textAlign = "center";
     for (const type of TYPES) {
       const data = stats[type];
-      if (data && typeof data.avgHealth !== 'undefined') {
-        statsCtx.fillText(`${SYMBOLS[type]} ${type}: ${data.count} (${(data.avgHealth * 100).toFixed(1)}% health)`, statsCanvas.width / 2, y);
+      if (data && typeof data.avgHealth !== "undefined") {
+        statsCtx.fillText(
+          `${SYMBOLS[type]} ${type}: ${data.count} (${(data.avgHealth * 100).toFixed(1)}% health)`,
+          statsCanvas.width / 2,
+          y,
+        );
       } else {
-        statsCtx.fillText(`${SYMBOLS[type]} ${type}: ${data.count} (0% health)`, statsCanvas.width / 2, y);
+        statsCtx.fillText(
+          `${SYMBOLS[type]} ${type}: ${data.count} (0% health)`,
+          statsCanvas.width / 2,
+          y,
+        );
       }
       y += 18;
     }
@@ -1090,7 +1716,7 @@ function updateUI(currentTime) {
     statsCtx.fillStyle = COLORS.ND_FILTER_COLOR;
     statsCtx.fillRect(0, 0, statsCanvas.width, statsCanvas.height);
   } catch (error) {
-    console.warn('Error updating UI:', error);
+    console.warn("Error updating UI:", error);
   }
 }
 
@@ -1113,7 +1739,7 @@ function drawEntities() {
     const group = groups[groupKey];
     if (group.length < 2) continue;
 
-    const color = groupColor(parseInt(groupKey.split('_')[1]));
+    const color = groupColor(parseInt(groupKey.split("_")[1]));
     ctx.strokeStyle = color;
     ctx.globalAlpha = 0.6; // Fixed opacity for consistent visibility
 
@@ -1127,7 +1753,8 @@ function drawEntities() {
 
         if (dist > minDist && dist < CONFIG.MAX_ATTRACT_DIST) {
           // Thickness based on inverse distance (thinner far, up to 200% thicker when close)
-          const thicknessMultiplier = 1 + 1 * (1 - (dist / CONFIG.MAX_ATTRACT_DIST));
+          const thicknessMultiplier =
+            1 + 1 * (1 - dist / CONFIG.MAX_ATTRACT_DIST);
           ctx.lineWidth = 0.5 * thicknessMultiplier; // Base 0.5, up to 1.0
 
           ctx.beginPath();
@@ -1159,7 +1786,9 @@ function animate() {
   }
 
   updateSimulation();
+  particleManager.update(); // Update all particles
   drawEntities();
+  particleManager.draw(ctx); // Draw particles on top of entities
 
   // UI updates every frame for responsive stats/graph
   updateUI(currentTime);
